@@ -220,6 +220,17 @@ impl NyxConfig {
         self.config.runtime.set_reuse_snapshot_path(path);
     }
 
+    /* P6 pre-snapshot: directory of the schema-independent "DB booted + empty" pre-image. */
+    pub fn set_pre_path(&mut self, path: String) {
+        self.config.runtime.set_pre_path(path);
+    }
+
+    /* P6 pre-snapshot: true = create the pre-image (guest LOCK -> serialize -> QEMU exit);
+     * false = reuse it (load pre, build root). Only meaningful when pre_path is set. */
+    pub fn set_create_pre_image(&mut self, v: bool) {
+        self.config.runtime.set_create_pre_image(v);
+    }
+
     /* Returns the currently configured process role of the fuzz runner. */
     pub fn process_role(&self) -> &QemuNyxRole {
         self.config.runtime.process_role()

@@ -239,6 +239,15 @@ pub struct RuntimeConfig {
     /* Configurable option to reuse a snapshot from a previous run (useful to avoid VM bootstrapping). */
     reuse_snapshot_path: Option<String>,
 
+    /* Pre-snapshot (schema-independent "DB booted + empty") directory.
+     *  - With create_pre_image=true  -> create_pre mode: QEMU emits `pre_path=DIR,load=off` (no path=),
+     *    boots, the guest's nyx_lock() serializes the pre-image to DIR, then QEMU shuts down.
+     *  - With create_pre_image=false -> reuse_pre mode: QEMU emits `path=workdir/snapshot/,pre_path=DIR,load=off`,
+     *    loads the pre-image (skips boot), the guest builds schema and the first acquire creates the root.
+     *  Only honoured by the QemuKernel runner (our config). */
+    pre_path: Option<String>,
+    create_pre_image: bool,
+
     /* enable advanced VM debug mode (such as spawning a VNC server per VM) */
     debug_mode: bool,
 
@@ -255,6 +264,8 @@ impl RuntimeConfig{
             hprintf_fd: None,
             process_role: QemuNyxRole::StandAlone,
             reuse_snapshot_path: None,
+            pre_path: None,
+            create_pre_image: false,
             debug_mode: false,
             worker_id: 0,
             aux_buffer_size: DEFAULT_AUX_BUFFER_SIZE,
@@ -290,6 +301,24 @@ impl RuntimeConfig{
     pub fn set_reuse_snapshot_path(&mut self, path: String){
         let path = Path::new(&path).canonicalize().unwrap().to_str().unwrap().to_string();
         self.reuse_snapshot_path = Some(path);
+    }
+
+    pub fn pre_path(&self) -> Option<String> {
+        self.pre_path.clone()
+    }
+
+    /* Stored as-is (NOT canonicalized): for create_pre mode the dir is created by the caller just
+     * before spawn and may need an absolute path the caller already supplied. */
+    pub fn set_pre_path(&mut self, path: String){
+        self.pre_path = Some(path);
+    }
+
+    pub fn create_pre_image(&self) -> bool {
+        self.create_pre_image
+    }
+
+    pub fn set_create_pre_image(&mut self, v: bool){
+        self.create_pre_image = v;
     }
 
     pub fn debug_mode(&self) -> bool {

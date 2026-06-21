@@ -129,7 +129,9 @@ impl QemuParams {
         else{
             match fuzzer_config.runner.clone(){
                 FuzzRunnerConfig::QemuKernel(_) => {
-
+                    // P6 pre-snapshot: pre_path (set) + create_pre_image distinguishes the two modes.
+                    let pre = fuzzer_config.runtime.pre_path();
+                    let create_pre = fuzzer_config.runtime.create_pre_image();
                     match fuzzer_config.runtime.process_role() {
                         QemuNyxRole::StandAlone => {
                             cmd.push("-fast_vm_reload".to_string());
@@ -137,7 +139,21 @@ impl QemuParams {
                         },
                         QemuNyxRole::Parent => {
                             cmd.push("-fast_vm_reload".to_string());
-                            cmd.push(format!("path={}/snapshot/,load=off", workdir));
+                            match (&pre, create_pre) {
+                                // create-pre: no path=; the guest's nyx_lock() serializes the pre-image
+                                // to `p`, then QEMU shuts itself down (REQUEST_SAVE_SNAPSHOT_PRE).
+                                (Some(p), true) => {
+                                    cmd.push(format!("pre_path={},load=off", p));
+                                },
+                                // reuse-pre: load pre-image `p` (skips boot+DB-start), the guest builds
+                                // schema and the FIRST acquire creates the root at workdir/snapshot/.
+                                (Some(p), false) => {
+                                    cmd.push(format!("path={}/snapshot/,pre_path={},load=off", workdir, p));
+                                },
+                                (None, _) => {
+                                    cmd.push(format!("path={}/snapshot/,load=off", workdir));
+                                },
+                            }
                         },
                         QemuNyxRole::Child => {
                             cmd.push("-fast_vm_reload".to_string());
