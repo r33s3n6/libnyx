@@ -135,7 +135,16 @@ impl QemuParams {
                     match fuzzer_config.runtime.process_role() {
                         QemuNyxRole::StandAlone => {
                             cmd.push("-fast_vm_reload".to_string());
-                            cmd.push(format!("path={}/snapshot/,load=off,skip_serialization=on", workdir));
+                            match &pre {
+                                // reuse-pre (in-memory): load pre-image `p`, build root IN MEMORY
+                                // (skip_serialization => no ~4GB root dump to disk), run the test loop.
+                                Some(p) => {
+                                    cmd.push(format!("path={}/snapshot/,load=off,pre_path={},skip_serialization=on", workdir, p));
+                                },
+                                None => {
+                                    cmd.push(format!("path={}/snapshot/,load=off,skip_serialization=on", workdir));
+                                },
+                            }
                         },
                         QemuNyxRole::Parent => {
                             cmd.push("-fast_vm_reload".to_string());
