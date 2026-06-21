@@ -344,6 +344,18 @@ impl NyxProcess {
         self.process.aux_buffer().result.tmp_snapshot_created != 0
     }
 
+    pub fn aux_dirty_pages(&self) -> u32 {
+        self.process.aux_buffer().result.dirty_pages
+    }
+
+    pub fn aux_runtime_usec(&self) -> u32 {
+        self.process.aux_buffer().result.runtime_usec
+    }
+
+    pub fn aux_state(&self) -> u8 {
+        self.process.aux_buffer().result.state
+    }
+
     pub fn aux_string(&self) -> String {
         let len = self.process.aux_buffer().misc.len;
         String::from_utf8_lossy(&self.process.aux_buffer().misc_data_slice()[0..len as usize]).to_string()
