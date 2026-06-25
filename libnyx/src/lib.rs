@@ -388,6 +388,13 @@ impl NyxProcess {
         }
     }
 
+    /// HOST-CONTROLLED REWIND (stalefuzz): rewind (reset) the VM directly from the host, with no guest
+    /// release/hypercall involved. Use this between runs to return to the snapshot after the host has
+    /// inspected/dumped the dirty post-run state.
+    pub fn reset(&mut self) {
+        let _ = self.process.reset();
+    }
+
     pub fn set_input_ptr(&mut self, buffer: *const u8, size: u32) {
         unsafe{
             std::ptr::copy(&size, self.process.payload.as_mut_ptr() as *mut u32, 1 as usize);

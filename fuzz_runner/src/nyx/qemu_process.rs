@@ -71,6 +71,16 @@ fn run_qemu(ctrl: &mut UnixStream) -> io::Result<()>{
     Ok(())
 }
 
+/* HOST-CONTROLLED REWIND (stalefuzz): write the NYX_INTERFACE_RELOAD ('r' = 114) control byte instead of
+ * the usual PING ('x' = 120). QEMU's interface handler rewinds the VM DIRECTLY (synchronization_reset_
+ * from_host) — no guest release — then unlocks the guest so it reprimes to its next next_payload and
+ * sends the PING we wait for here. */
+fn reset_qemu(ctrl: &mut UnixStream) -> io::Result<()>{
+    ctrl.write_all(&[114_u8])?;
+    wait_qemu(ctrl)?;
+    Ok(())
+}
+
 fn make_shared_data(file: &File, size: usize) -> &'static mut [u8] {
     let prot = ProtFlags::PROT_READ | ProtFlags::PROT_WRITE;
     let flags = MapFlags::MAP_SHARED;
@@ -391,6 +401,23 @@ impl QemuProcess {
                     panic!("[!] libnyx: ERROR -> unkown Nyx exec result code: {}", x);
                 }
             }
+        }
+        Ok(())
+    }
+
+    /* HOST-CONTROLLED REWIND (stalefuzz): rewind the VM DIRECTLY from the host (no guest release). Writes
+     * the 'r' control byte; QEMU restores the snapshot (synchronization_reset_from_host) and unlocks the
+     * guest, which reprimes to its next next_payload. Drain any hprintf the reprime emits (normally none). */
+    pub fn reset(&mut self) -> io::Result<()> {
+        mem_barrier();
+        reset_qemu(&mut self.ctrl)?;
+        mem_barrier();
+        while self.aux.result.exec_result_code == NYX_HPRINTF {
+            let len = self.aux.misc.len;
+            QemuProcess::output_hprintf(&mut self.hprintf_file, &String::from_utf8_lossy(&self.aux.misc_data_slice()[0..len as usize]).yellow());
+            mem_barrier();
+            run_qemu(&mut self.ctrl)?;
+            mem_barrier();
         }
         Ok(())
     }
